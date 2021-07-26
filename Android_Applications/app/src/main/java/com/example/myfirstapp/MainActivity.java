@@ -1,7 +1,6 @@
 package com.example.myfirstapp;
 
 import androidx.annotation.NonNull;
-import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 
 import android.Manifest;
@@ -24,9 +23,17 @@ public class MainActivity extends AppCompatActivity {
     private static final int PERMISSION_CODE = 1000;
     private static final int IMAGE_CAPTURE_CODE = 1001;
     ImageButton mCaptureBtn;
+    ImageButton mChooseBtn;
     ImageView mImageView;
+    boolean Capture1 = false;
+    boolean Capture2 = false;
+    boolean Gallery1 = false;
+
+    boolean ImageWasCaptured;
+    boolean ImageSelectedFromGallery;
 
     Uri image_uri;
+    private int IMAGE_PICK_CODE = 1000;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -50,11 +57,40 @@ public class MainActivity extends AppCompatActivity {
         Button SubmitButton = (Button) findViewById(R.id.SubmitButton);
         SubmitButton.setText("Submit");
 
-        //Using Camera and Button
+        //Initializing new variables for easier access
         mImageView = findViewById(R.id.image_view);
         mCaptureBtn = findViewById(R.id.CameraButton);
+        mChooseBtn = findViewById(R.id.ChooseButton);
 
-        //Button Click
+        //Accessing Files via Image Button
+        mChooseBtn.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view2) {
+                //checking permission
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    if(checkSelfPermission(Manifest.permission.READ_EXTERNAL_STORAGE)
+                    == PackageManager.PERMISSION_DENIED) {
+                        //permission not granted, request it
+                        String[] GalleryPermissions = {Manifest.permission.READ_EXTERNAL_STORAGE};
+                        //show popup for permission
+                        requestPermissions(GalleryPermissions, PERMISSION_CODE);
+
+                    }
+                    else {
+                        Gallery1 = true;
+                        //permission already granted
+                        pickImageFromGallery();
+                    }
+                }
+                else {
+                    Gallery1 = true;
+                    //system os is less than marshmallow
+                    pickImageFromGallery();
+                }
+            }
+        });
+
+        //Button Click for Accessing Camera
         mCaptureBtn.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -70,11 +106,13 @@ public class MainActivity extends AppCompatActivity {
                         requestPermissions(permissions, PERMISSION_CODE);
                     }
                     else {
+                        Capture1 = true;
                         //permission already granted
                         openCamera();
                     }
                 }
                 else {
+                    Capture2 = true;
                     //system os < marshmallow
                     openCamera();
                 }
@@ -84,7 +122,17 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    private void pickImageFromGallery() {
+        Gallery1 = false;
+        Intent GalleryIntent = new Intent(Intent.ACTION_PICK);
+        GalleryIntent.setType("image/*");
+        startActivityForResult(GalleryIntent, IMAGE_PICK_CODE);
+        ImageSelectedFromGallery = true;
+    }
+
     private void openCamera() {
+        Capture1 = false;
+        Capture2 = false;
         ContentValues values = new ContentValues();
         values.put(MediaStore.Images.Media.TITLE, "New Picture");
         values.put(MediaStore.Images.Media.DESCRIPTION, "From the Camera");
@@ -93,6 +141,7 @@ public class MainActivity extends AppCompatActivity {
         Intent cameraIntent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
         cameraIntent.putExtra(MediaStore.EXTRA_OUTPUT, image_uri);
         startActivityForResult(cameraIntent, IMAGE_CAPTURE_CODE);
+        ImageWasCaptured = true;
     }
 
     @Override
@@ -102,8 +151,12 @@ public class MainActivity extends AppCompatActivity {
             case PERMISSION_CODE: {
                 if (grantResults.length > 0 && grantResults[0] ==
                         PackageManager.PERMISSION_GRANTED) {
-                    //Permission was granted
-                    openCamera();
+                    if (Gallery1 == true) {
+                        pickImageFromGallery();
+                    }
+                    else if(Capture1 == true || Capture2 == true) {
+                            openCamera();
+                        }
                 } else {
                     //permission was denied
                     Toast.makeText(this, "Permission Denied", Toast.LENGTH_SHORT).show();
@@ -116,11 +169,21 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         //called when image was captured from camera
-
         super.onActivityResult(requestCode, resultCode, data);
-        if (resultCode == RESULT_OK) {
-            //set image captured to out ImageView
-            mImageView.setImageURI(image_uri);
+        if (ImageWasCaptured == true) {
+            if (resultCode == RESULT_OK) {
+                //set image captured to out ImageView
+                mImageView.setImageURI(image_uri);
+                ImageWasCaptured = false;
+            }
+        }
+        else {
+            if (ImageSelectedFromGallery == true) {
+                if (resultCode == RESULT_OK && requestCode == IMAGE_PICK_CODE) {
+                    mImageView.setImageURI(data.getData());
+                    ImageSelectedFromGallery = false;
+                }
+            }
         }
     }
 
